@@ -24,7 +24,13 @@ def merge_in_win(list, source_path, target_file):
     return res.returncode
 
 
-def merge_ts(os_name: str, content_list: List, parent_dir: str, source_path: str, target_file_name: str, target_path: str = '', is_long: bool = False):
+def merge_ts(os_name: str,
+             content_list: List,
+             parent_dir: str,
+             source_path: str,
+             target_file_name: str,
+             target_path: str = '',
+             is_long: bool = True):
     '''
     is_long: 如果合并的文件太多,会有长度限制, 所以一般超过800个ts文件[如果用数字命名:1.ts,2.t3,3.ts...],我就会使用这个参数
     '''
@@ -36,11 +42,15 @@ def merge_ts(os_name: str, content_list: List, parent_dir: str, source_path: str
     res = -1
     bash_file_name = 'ts_sh'
     if os_name == 'windows':
+        # 拷贝不同磁盘的时候, 完整路径都要加上
+        content_list = [
+            f'{os.path.join(source_path_abs,i)}' for i in content_list
+        ]
         ts_str = '+'.join(content_list)
         bash_str = f'cd "{source_path_abs}" && copy /b {ts_str} "{target_file_abs}"'
         if is_long:
-            bash_file_path = os.path.join(
-                source_path_abs, f'{bash_file_name}.cmd')
+            bash_file_path = os.path.join(source_path_abs,
+                                          f'{bash_file_name}.cmd')
             with open(bash_file_path, mode='w', encoding='utf8') as f:
                 f.write(bash_str)
             bash_str = bash_file_path
@@ -48,15 +58,22 @@ def merge_ts(os_name: str, content_list: List, parent_dir: str, source_path: str
         ts_str = ' '.join(content_list)
         bash_str = f'cd "{source_path_abs}" && cat {ts_str} > "{target_file_abs}"'
         if is_long:
-            bash_file_path = os.path.join(
-                source_path_abs, f'{bash_file_name}.sh')
+            bash_file_path = os.path.join(source_path_abs,
+                                          f'{bash_file_name}.sh')
             with open(bash_file_path, mode='w', encoding='utf8') as f:
                 f.write(bash_str)
             bash_str = f'chmod +x {bash_file_path} && {bash_file_path}'
 
     try:
-        res = subprocess.run(bash_str, shell=True, stdout=subprocess.DEVNULL)
-        return res.returncode
+        res = subprocess.run(bash_str,
+                             shell=True,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        res_code = res.returncode
+        if res_code != 0:
+            print(res.stdout.decode("utf8"))
+            return -1
+        return 0
     except Exception as e:
         print(e)
         return -1
